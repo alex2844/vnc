@@ -1,0 +1,60 @@
+#!/bin/bash
+
+function service {
+	echo '#!/bin/bash' > vncserver;
+	echo 'PATH="$PATH:/usr/bin/"' >> vncserver;
+	echo 'export USER="'$user'"' >> vncserver;
+	echo 'DISPLAY="1"' >> vncserver;
+	echo 'DEPTH="16"' >> vncserver;
+	echo 'GEOMETRY="'$g'"' >> vncserver;
+	echo 'OPTIONS="-depth ${DEPTH} -geometry ${GEOMETRY} :${DISPLAY} -localhost"' >> vncserver;
+	echo '. /lib/lsb/init-functions' >> vncserver;
+	echo 'case "$1" in' >> vncserver;
+	echo 'start)' >> vncserver;
+	echo 'log_action_begin_msg "Starting vncserver"' >> vncserver;
+	echo 'su ${USER} -c "/usr/bin/vncserver ${OPTIONS}"' >> vncserver;
+	echo ';;' >> vncserver;
+	echo 'stop)' >> vncserver;
+	echo 'log_action_begin_msg "Stopping vncserver"' >> vncserver;
+	echo 'su ${USER} -c "/usr/bin/vncserver -kill :${DISPLAY}"' >> vncserver;
+	echo ';;' >> vncserver;
+	echo 'restart)' >> vncserver;
+	echo '$0 stop' >> vncserver;
+	echo '$0 start' >> vncserver;
+	echo ';;' >> vncserver;
+	echo 'esac' >> vncserver;
+	echo 'exit 0' >> vncserver;
+	chmod +x vncserver;
+}
+if [ -e "/usr/local/chroots" ]; then
+	cd /usr/local/chroots/*/home/;
+	gx=`xrandr | sed -n 's/.\{0,\}current \([0-9]\{1,\}\) x [0-9]\{1,\}.\{0,\}/\1/g;p;q'`
+	gy=`xrandr | sed -n 's/.\{0,\}current [0-9]\{1,\} x \([0-9]\{1,\}\).\{0,\}/\1/g;p;q'`;
+	g=$gx'x'$gy;
+	user=`ls`
+	cd $user;
+	wget -O vnc_install 'https://github.com/alex2844/vnc/raw/master/server';
+	service;
+	sudo mv vncserver ../../etc/init.d/vncserver;
+else
+	sudo apt-get update;
+	sudo apt-get install xfce4 xfce4-goodies tightvncserver -y;
+	vncserver;
+	vncserver -kill :1;
+	mv ~/.vnc/xstartup ~/.vnc/xstartup.bak;
+	echo '#!/bin/bash' > ~/.vnc/xstartup
+	echo 'xrdb $HOME/.Xresources' >> ~/.vnc/xstartup;
+	echo 'startxfce4 &' >> ~/.vnc/xstartup;
+	chmod +x ~/.vnc/xstartup;
+	if [ ! -e "/etc/init.d/vncserver" ]; then
+		echo 'enter geometry';
+		read g;
+		echo 'enter username';
+		read user;
+		service;
+		sudo mv vncserver /etc/init.d/vncserver;
+		echo 'ssh -L 5901:127.0.0.1:5901 -N -f -l user server_ip_address';
+	fi
+	sudo service vncserver start;
+	sudo update-rc.d vncserver defaults;
+fi
